@@ -29,7 +29,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-app.post('/upload', upload.single('file'), (req, res) => {
+app.post('/upload', upload.single('image'), (req, res) => {
     res.send({
         message: 'File uploaded successfully',
         savedAs: req.file.filename,
