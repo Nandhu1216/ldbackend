@@ -11,7 +11,9 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-const UPLOAD_DIR = process.env.UPLOAD_DIR || 'D:/uploads';
+
+const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, 'uploads');
+
 const PORT = process.env.PORT || 3000;
 
 const storage = multer.diskStorage({
