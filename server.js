@@ -1,66 +1,59 @@
 require('dotenv').config();
 const express = require('express');
 const multer = require('multer');
-const cors = require('cors');
-const { v2: cloudinary } = require('cloudinary');
-const fs = require('fs');
 const path = require('path');
+const fs = require('fs');
+const cors = require('cors');
+const cloudinary = require('cloudinary').v2;
 
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
+// Configure Cloudinary
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-const upload = multer({ dest: 'temp_uploads/' }); // Local temp storage
+// Temporary storage for incoming file
+const upload = multer({ dest: 'temp/' });
 
+// Upload endpoint
 app.post('/upload', upload.single('image'), async (req, res) => {
-    const { zone = 'default_zone', supervisor = 'default_supervisor' } = req.body;
+    const { zone, supervisor } = req.body;
+    const file = req.file;
 
-    if (!req.file) return res.status(400).send({ message: 'No file received' });
+    if (!zone || !supervisor || !file) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const folderPath = `org/zone-${zone}/${supervisor}`;
 
     try {
-        const result = await cloudinary.uploader.upload(req.file.path, {
-            folder: `${zone}/${supervisor}`,
+        // Upload to Cloudinary with folder structure
+        const result = await cloudinary.uploader.upload(file.path, {
+            folder: folderPath,
         });
 
-        console.log('☁️ Cloudinary URL:', result.secure_url);
+        // Delete the temporary file
+        fs.unlinkSync(file.path);
 
-        // Optional: auto-download to PC
-        const downloadDir = path.join(__dirname, 'downloads', zone, supervisor);
-        fs.mkdirSync(downloadDir, { recursive: true });
-
-        const fileName = `${Date.now()}-${path.basename(result.secure_url)}`;
-        const filePath = path.join(downloadDir, fileName);
-
-        const https = require('https');
-        const file = fs.createWriteStream(filePath);
-        https.get(result.secure_url, (response) => {
-            response.pipe(file);
-            file.on('finish', () => {
-                file.close();
-                console.log('📥 Downloaded to PC:', filePath);
-            });
-        });
-
-        res.send({
-            message: 'Uploaded to cloud and downloaded to PC',
+        res.status(200).json({
+            message: 'Upload successful',
             url: result.secure_url,
+            public_id: result.public_id,
+            folder: folderPath,
         });
     } catch (error) {
-        console.error('❌ Upload failed:', error);
-        res.status(500).send({ message: 'Upload failed', error });
-    } finally {
-        fs.unlinkSync(req.file.path); // Clean up temp file
+        console.error('❌ Upload error:', error);
+        res.status(500).json({ error: 'Cloudinary upload failed', details: error });
     }
 });
 
-const PORT = process.env.PORT || 3000;
+// Start server
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-    console.log(`✅ Server running on port ${PORT}`);
+    console.log(`🚀 Server running on port ${PORT}`);
 });
