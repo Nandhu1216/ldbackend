@@ -11,40 +11,30 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// 🔁 Define folders to sync (match your Flutter upload path)
-const foldersToDownload = [
-    'org/zone-1/John',
-    'org/zone-1/Alex',
-    'org/zone-2/Maya',
-    'org/zone-2/Ravi',
-    'org/zone-3/Priya',
-    'org/zone-3/David',
-    'org/zone-4/Sara',
-    'org/zone-4/Arun',
-];
+// 🗂️ Root Cloudinary folder
+const cloudRoot = 'Zones';
+const baseDir = 'D:/Zones'; // ✅ Store locally in D:/org
 
-// ✅ Change baseDir to D: drive
-const baseDir = 'D:/org';
-
-async function downloadImages(folderName) {
+async function downloadAllImagesUnderOrg() {
     try {
         const { resources } = await cloudinary.search
-            .expression(`folder:${folderName}`)
-            .sort_by('created_at', 'desc')
-            .max_results(100)
+            .expression(`folder:${cloudRoot}`)
+            .with_field('context')
+            .max_results(500) // Increase if needed
             .execute();
 
         for (const resource of resources) {
             const url = resource.secure_url;
-            const filename = path.basename(url);
+            const publicId = resource.public_id; // e.g., org/zone-1/John/ward-1/2025-06-14/image_xxxx
+            const relativePath = publicId.replace(`${cloudRoot}/`, ''); // zone-1/John/ward-1/date/filename
 
-            // 🛣️ Adjust folder path to D:/org/zone-x/Supervisor/
-            const relativePath = folderName.replace('org/', '');
-            const localFolder = path.join(baseDir, relativePath);
+            const filename = path.basename(url);
+            const localFolder = path.join(baseDir, path.dirname(relativePath));
             const localPath = path.join(localFolder, filename);
 
+            // Skip if file already exists
             if (fs.existsSync(localPath)) {
-                console.log(`⏩ Already exists: ${filename}`);
+                console.log(`⏭️ Already exists: ${localPath}`);
                 continue;
             }
 
@@ -57,17 +47,15 @@ async function downloadImages(folderName) {
             });
         }
     } catch (err) {
-        console.error(`❌ Error in ${folderName}:`, err.message);
+        console.error(`❌ Error during sync:`, err.message);
     }
 }
 
-function syncAllFolders() {
+function syncNow() {
     console.log(`🕒 Sync started at ${new Date().toLocaleString()}`);
-    foldersToDownload.forEach((folder) => downloadImages(folder));
+    downloadAllImagesUnderOrg();
 }
 
-// ⏱️ Run every hour on the hour
-cron.schedule('0 * * * *', syncAllFolders);
-
-// ▶️ Run immediately on startup too
-syncAllFolders();
+// Run immediately and then every hour
+syncNow();
+cron.schedule('0 * * * *', syncNow);

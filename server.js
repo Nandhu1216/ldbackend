@@ -17,28 +17,26 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// Temporary storage for incoming file
+// Temp file storage setup
 const upload = multer({ dest: 'temp/' });
 
 // Upload endpoint
 app.post('/upload', upload.single('image'), async (req, res) => {
-    const { zone, supervisor } = req.body;
+    const { zone, supervisor, ward, date } = req.body;
     const file = req.file;
 
-    if (!zone || !supervisor || !file) {
+    if (!zone || !supervisor || !ward || !date || !file) {
         return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const folderPath = `org/zone-${zone}/${supervisor}`;
+    const folderPath = `Zones/${zone}/${supervisor}/${ward}/${date}`;
 
     try {
-        // Upload to Cloudinary with folder structure
         const result = await cloudinary.uploader.upload(file.path, {
             folder: folderPath,
         });
 
-        // Delete the temporary file
-        fs.unlinkSync(file.path);
+        fs.unlinkSync(file.path); // Clean up temp file
 
         res.status(200).json({
             message: 'Upload successful',
