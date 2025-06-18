@@ -5,17 +5,17 @@ const https = require('https');
 const path = require('path');
 const cron = require('node-cron');
 
-// 🛠️ Cloudinary config
+// Cloudinary config
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-const cloudRoot = 'Zones';           // Cloud root folder
-const baseDir = 'D:/Zones';          // Local root folder
+const cloudRoot = 'Zones';
+const baseDir = 'D:/Zones';
 
-// ⬇️ File download helper
+// Helper to download a file
 function downloadFile(url, dest) {
     return new Promise((resolve, reject) => {
         const file = fs.createWriteStream(dest);
@@ -29,14 +29,28 @@ function downloadFile(url, dest) {
             });
         }).on('error', (err) => {
             if (fs.existsSync(dest)) fs.unlinkSync(dest);
-            console.error(`❌ Download failed: ${dest}`, err.message);
+            console.error(`❌ Failed to download: ${dest}`, err.message);
             reject(err);
         });
     });
 }
 
-// 📥 Sync from Cloudinary
-async function downloadAllImagesUnderOrg() {
+// Extract full info
+function extractFolderInfo(publicId) {
+    // Format: Zones/zone-1/supervisor/ward/category/date/image
+    const parts = publicId.split('/');
+    return {
+        zone: parts[1] || 'unknown-zone',
+        supervisor: parts[2] || 'unknown-supervisor',
+        ward: parts[3] || 'unknown-ward',
+        category: parts[4] || 'unknown-category',
+        date: parts[5] || 'unknown-date',
+        filename: parts[6] || 'image'
+    };
+}
+
+// Download and store in full + dailywork path
+async function downloadAllImages() {
     try {
         const result = await cloudinary.search
             .expression(`folder:${cloudRoot}/*`)
@@ -45,37 +59,46 @@ async function downloadAllImagesUnderOrg() {
 
         const resources = result.resources;
         if (!resources || resources.length === 0) {
-            console.log('⚠️ No resources found under Zones/*');
+            console.log('⚠️ No resources found under Zones/');
             return;
         }
 
         for (const resource of resources) {
             const url = resource.secure_url;
-            const publicId = resource.public_id; // e.g., Zones/Zone-1/Rahul/1/date/photo
-            const relativePath = publicId.replace(`${cloudRoot}/`, '');
-            const cloudFileName = path.basename(relativePath);
-            const ext = path.extname(url.split('?')[0]) || '.jpg'; // from URL
-            const localFolder = path.join(baseDir, path.dirname(relativePath));
-            const localPath = path.join(localFolder, `${cloudFileName}${ext}`);
+            const publicId = resource.public_id;
+            const ext = path.extname(url.split('?')[0]) || '.jpg';
 
-            if (fs.existsSync(localPath)) {
-                console.log(`⏭️ Skipped (already exists): ${localPath}`);
+            const { zone, supervisor, ward, category, date, filename } = extractFolderInfo(publicId);
+
+            // Full folder: D:/Zones/zone-1/supervisor/ward/category/date/filename.jpg
+            const fullPath = path.join(baseDir, zone, supervisor, ward, category, date);
+            const fullFile = path.join(fullPath, `${filename}${ext}`);
+
+            // Dailywork folder: D:/Zones/dailywork/category/date/filename.jpg
+            const dailyPath = path.join(baseDir, 'dailywork', category, date);
+            const dailyFile = path.join(dailyPath, `${filename}${ext}`);
+
+            if (fs.existsSync(fullFile) && fs.existsSync(dailyFile)) {
+                console.log(`⏭️ Skipped (already exists): ${filename}`);
                 continue;
             }
 
-            fs.mkdirSync(localFolder, { recursive: true });
-            await downloadFile(url, localPath);
+            fs.mkdirSync(fullPath, { recursive: true });
+            fs.mkdirSync(dailyPath, { recursive: true });
+
+            await downloadFile(url, fullFile);
+            await downloadFile(url, dailyFile);
         }
     } catch (err) {
-        console.error('❌ Error fetching from Cloudinary:', err.message);
+        console.error('❌ Error downloading from Cloudinary:', err.message);
     }
 }
 
-// 🔁 Start now and schedule hourly
+// Run now + hourly schedule
 function syncNow() {
     console.log(`🕒 Sync started at ${new Date().toLocaleString()}`);
-    downloadAllImagesUnderOrg();
+    downloadAllImages();
 }
 
 syncNow();
-cron.schedule('0 * * * *', syncNow); // Every hour
+cron.schedule('0 * * * *', syncNow); // every hour

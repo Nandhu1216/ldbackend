@@ -19,31 +19,36 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// 🌐 Upload to Cloudinary (folder structure only, auto filename)
+// 📤 Upload Endpoint
 app.post('/upload', upload.single('image'), async (req, res) => {
-    const { zone, supervisor, ward, date } = req.body;
+    const { zone, supervisor, ward, category, date } = req.body;
     const file = req.file;
 
-    if (!zone || !supervisor || !ward || !date || !file) {
+    // 🛑 Check required fields
+    if (!zone || !supervisor || !ward || !category || !date || !file) {
         return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const folderPath = `Zones/${zone}/${supervisor}/${ward}/${date}`;
+    // 📁 Build folder structure
+    const folderPath = `Zones/${zone}/${supervisor}/${ward}/${category}/${date}`;
 
     try {
+        // ☁️ Upload to Cloudinary
         const result = await cloudinary.uploader.upload(file.path, {
-            folder: folderPath,           // ✅ Folder structure
-            use_filename: true,           // ✅ Keep original name
-            unique_filename: true,        // ✅ Avoid overwrite
+            folder: folderPath,
+            use_filename: true,
+            unique_filename: true,
             overwrite: false,
         });
 
-        fs.unlinkSync(file.path); // Clean up temp file
+        // 🧹 Clean up temp file
+        fs.unlinkSync(file.path);
 
+        // ✅ Respond
         res.status(200).json({
             message: '✅ Upload successful',
             url: result.secure_url,
-            cloudinary_path: result.public_id, // public_id will include full folder path
+            cloudinary_path: result.public_id,
         });
     } catch (err) {
         console.error('❌ Upload error:', err);
@@ -51,7 +56,7 @@ app.post('/upload', upload.single('image'), async (req, res) => {
     }
 });
 
-// Start server
+// 🚀 Start Server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
