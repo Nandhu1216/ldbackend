@@ -22,7 +22,8 @@ async function downloadAllImagesUnderOrg() {
             .with_field('context')
             .max_results(500) // Increase if needed
             .execute();
-
+        console.log(`📦 Found ${resources.length} resources`);
+        console.log(JSON.stringify(resources.map(r => r.public_id), null, 2));
         for (const resource of resources) {
             const url = resource.secure_url;
             const publicId = resource.public_id; // e.g., org/zone-1/John/ward-1/2025-06-14/image_xxxx
@@ -59,3 +60,4 @@ function syncNow() {
 // Run immediately and then every hour
 syncNow();
 cron.schedule('0 * * * *', syncNow);
+
