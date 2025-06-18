@@ -27,18 +27,25 @@ app.post('/upload', upload.single('image'), async (req, res) => {
 
     // 🛑 Validate required fields
     if (!zone || !supervisor || !ward || !category || !date || !file) {
+        console.error('❌ Missing required fields:', {
+            zone, supervisor, ward, category, date, file: file?.originalname,
+        });
         return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // 📁 New folder structure: date before category
+    // 📁 Folder structure: Zones/Zone/Supervisor/Ward/Date/Category
     const folderPath = `Zones/${zone}/${supervisor}/${ward}/${date}/${category}`;
+    console.log('📥 Upload request received:');
+    console.log('  Folder Path:', folderPath);
+    console.log('  Original Filename:', file.originalname);
 
     try {
-        // ☁️ Upload to Cloudinary
+        const originalName = path.parse(file.originalname).name;
+
+        // ☁️ Upload to Cloudinary with fixed path and name
         const result = await cloudinary.uploader.upload(file.path, {
             folder: folderPath,
-            use_filename: true,
-            unique_filename: true,
+            public_id: `${originalName}_${Date.now()}`,
             overwrite: false,
         });
 
@@ -51,6 +58,7 @@ app.post('/upload', upload.single('image'), async (req, res) => {
             url: result.secure_url,
             cloudinary_path: result.public_id,
         });
+
     } catch (err) {
         console.error('❌ Upload error:', err);
         res.status(500).json({ error: 'Upload failed' });

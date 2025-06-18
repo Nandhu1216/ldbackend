@@ -12,11 +12,11 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// 🔁 Root folder in Cloudinary and base local directory
+// 📁 Root cloud folder and local destination
 const cloudRoot = 'Zones';
 const baseDir = 'D:/Zones';
 
-// 📥 Helper: Download a file
+// 📥 Download helper
 function downloadFile(url, dest) {
     return new Promise((resolve, reject) => {
         const file = fs.createWriteStream(dest);
@@ -36,21 +36,26 @@ function downloadFile(url, dest) {
     });
 }
 
-// 🔍 Extract folder info from Cloudinary public_id
+// 🔍 Extract metadata from Cloudinary public_id
 function extractFolderInfo(publicId) {
-    // New format: Zones/zone/supervisor/ward/date/category/filename
     const parts = publicId.split('/');
+    // Safe fallback if structure is incorrect
+    if (parts.length < 7) {
+        console.warn(`⚠️ Unexpected path structure: ${publicId}`);
+        return null;
+    }
+
     return {
-        zone: parts[1] || 'unknown-zone',
-        supervisor: parts[2] || 'unknown-supervisor',
-        ward: parts[3] || 'unknown-ward',
-        date: parts[4] || 'unknown-date',
-        category: parts[5] || 'unknown-category',
-        filename: parts[6] || 'image'
+        zone: parts[1],
+        supervisor: parts[2],
+        ward: parts[3],
+        date: parts[4],
+        category: parts[5],
+        filename: parts[6],
     };
 }
 
-// 🔁 Download and store images in two locations
+// 🔄 Download images to local folders
 async function downloadAllImages() {
     try {
         const result = await cloudinary.search
@@ -69,34 +74,38 @@ async function downloadAllImages() {
             const publicId = resource.public_id;
             const ext = path.extname(url.split('?')[0]) || '.jpg';
 
-            const { zone, supervisor, ward, date, category, filename } = extractFolderInfo(publicId);
+            const info = extractFolderInfo(publicId);
+            if (!info) continue;
 
-            // 📁 Full folder: D:/Zones/zone/supervisor/ward/date/category/filename.jpg
+            const { zone, supervisor, ward, date, category, filename } = info;
+
+            // ✅ Proper local paths
             const fullPath = path.join(baseDir, zone, supervisor, ward, date, category);
             const fullFile = path.join(fullPath, `${filename}${ext}`);
 
-            // 📁 Dailywork folder: D:/Zones/dailywork/date/category/filename.jpg
             const dailyPath = path.join(baseDir, 'dailywork', date, category);
             const dailyFile = path.join(dailyPath, `${filename}${ext}`);
 
-            // Skip if both files exist
+            // Skip if already downloaded
             if (fs.existsSync(fullFile) && fs.existsSync(dailyFile)) {
                 console.log(`⏭️ Skipped (already exists): ${filename}`);
                 continue;
             }
 
+            // Ensure directories
             fs.mkdirSync(fullPath, { recursive: true });
             fs.mkdirSync(dailyPath, { recursive: true });
 
+            // Download both copies
             await downloadFile(url, fullFile);
             await downloadFile(url, dailyFile);
         }
     } catch (err) {
-        console.error('❌ Error downloading from Cloudinary:', err.message);
+        console.error('❌ Error during download:', err.message);
     }
 }
 
-// 🚀 Run now and every hour
+// 🚀 Run once now and hourly
 function syncNow() {
     console.log(`🕒 Sync started at ${new Date().toLocaleString()}`);
     downloadAllImages();
