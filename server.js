@@ -10,27 +10,28 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// 📂 Multer config - store temp files
 const upload = multer({ dest: 'temp/' });
 
-// Cloudinary Config
+// ☁️ Cloudinary config from .env
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// 📤 Upload Endpoint
+// 📤 Upload endpoint
 app.post('/upload', upload.single('image'), async (req, res) => {
     const { zone, supervisor, ward, category, date } = req.body;
     const file = req.file;
 
-    // 🛑 Check required fields
+    // 🛑 Validate required fields
     if (!zone || !supervisor || !ward || !category || !date || !file) {
         return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // 📁 Build folder structure
-    const folderPath = `Zones/${zone}/${supervisor}/${ward}/${category}/${date}`;
+    // 📁 New folder structure: date before category
+    const folderPath = `Zones/${zone}/${supervisor}/${ward}/${date}/${category}`;
 
     try {
         // ☁️ Upload to Cloudinary
@@ -44,7 +45,7 @@ app.post('/upload', upload.single('image'), async (req, res) => {
         // 🧹 Clean up temp file
         fs.unlinkSync(file.path);
 
-        // ✅ Respond
+        // ✅ Respond with uploaded file info
         res.status(200).json({
             message: '✅ Upload successful',
             url: result.secure_url,
@@ -56,7 +57,7 @@ app.post('/upload', upload.single('image'), async (req, res) => {
     }
 });
 
-// 🚀 Start Server
+// 🚀 Start the server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);

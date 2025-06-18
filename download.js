@@ -5,17 +5,18 @@ const https = require('https');
 const path = require('path');
 const cron = require('node-cron');
 
-// Cloudinary config
+// ☁️ Cloudinary configuration
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
+// 🔁 Root folder in Cloudinary and base local directory
 const cloudRoot = 'Zones';
 const baseDir = 'D:/Zones';
 
-// Helper to download a file
+// 📥 Helper: Download a file
 function downloadFile(url, dest) {
     return new Promise((resolve, reject) => {
         const file = fs.createWriteStream(dest);
@@ -35,21 +36,21 @@ function downloadFile(url, dest) {
     });
 }
 
-// Extract full info
+// 🔍 Extract folder info from Cloudinary public_id
 function extractFolderInfo(publicId) {
-    // Format: Zones/zone-1/supervisor/ward/category/date/image
+    // New format: Zones/zone/supervisor/ward/date/category/filename
     const parts = publicId.split('/');
     return {
         zone: parts[1] || 'unknown-zone',
         supervisor: parts[2] || 'unknown-supervisor',
         ward: parts[3] || 'unknown-ward',
-        category: parts[4] || 'unknown-category',
-        date: parts[5] || 'unknown-date',
+        date: parts[4] || 'unknown-date',
+        category: parts[5] || 'unknown-category',
         filename: parts[6] || 'image'
     };
 }
 
-// Download and store in full + dailywork path
+// 🔁 Download and store images in two locations
 async function downloadAllImages() {
     try {
         const result = await cloudinary.search
@@ -68,16 +69,17 @@ async function downloadAllImages() {
             const publicId = resource.public_id;
             const ext = path.extname(url.split('?')[0]) || '.jpg';
 
-            const { zone, supervisor, ward, category, date, filename } = extractFolderInfo(publicId);
+            const { zone, supervisor, ward, date, category, filename } = extractFolderInfo(publicId);
 
-            // Full folder: D:/Zones/zone-1/supervisor/ward/category/date/filename.jpg
-            const fullPath = path.join(baseDir, zone, supervisor, ward, category, date);
+            // 📁 Full folder: D:/Zones/zone/supervisor/ward/date/category/filename.jpg
+            const fullPath = path.join(baseDir, zone, supervisor, ward, date, category);
             const fullFile = path.join(fullPath, `${filename}${ext}`);
 
-            // Dailywork folder: D:/Zones/dailywork/category/date/filename.jpg
-            const dailyPath = path.join(baseDir, 'dailywork', category, date);
+            // 📁 Dailywork folder: D:/Zones/dailywork/date/category/filename.jpg
+            const dailyPath = path.join(baseDir, 'dailywork', date, category);
             const dailyFile = path.join(dailyPath, `${filename}${ext}`);
 
+            // Skip if both files exist
             if (fs.existsSync(fullFile) && fs.existsSync(dailyFile)) {
                 console.log(`⏭️ Skipped (already exists): ${filename}`);
                 continue;
@@ -94,11 +96,11 @@ async function downloadAllImages() {
     }
 }
 
-// Run now + hourly schedule
+// 🚀 Run now and every hour
 function syncNow() {
     console.log(`🕒 Sync started at ${new Date().toLocaleString()}`);
     downloadAllImages();
 }
 
 syncNow();
-cron.schedule('0 * * * *', syncNow); // every hour
+cron.schedule('0 * * * *', syncNow); // Every hour
