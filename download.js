@@ -5,46 +5,62 @@ const https = require('https');
 const path = require('path');
 const cron = require('node-cron');
 
+// Cloudinary config
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// 🗂️ Root Cloudinary folder
 const cloudRoot = 'Zones';
-const baseDir = 'D:/Zones'; // ✅ Store locally in D:/org
+const baseDir = 'D:/Zones';
+
+function downloadFile(url, dest) {
+    return new Promise((resolve, reject) => {
+        const file = fs.createWriteStream(dest);
+        https.get(url, (response) => {
+            response.pipe(file);
+            file.on('finish', () => {
+                file.close();
+                console.log(`✅ Downloaded: ${dest}`);
+                resolve();
+            });
+        }).on('error', (err) => {
+            fs.unlinkSync(dest);
+            console.error(`❌ Failed to download: ${dest}`, err.message);
+            reject(err);
+        });
+    });
+}
 
 async function downloadAllImagesUnderOrg() {
     try {
         const { resources } = await cloudinary.search
-            .expression(`folder:${cloudRoot}`)
-            .with_field('context')
-            .max_results(500) // Increase if needed
+            .expression(`public_id:${cloudRoot}/*`)
+            .max_results(500)
             .execute();
+
+        if (resources.length === 0) {
+            console.log('⚠️ No resources found under Zones/');
+            return;
+        }
 
         for (const resource of resources) {
             const url = resource.secure_url;
-            const publicId = resource.public_id; // e.g., org/zone-1/John/ward-1/2025-06-14/image_xxxx
-            const relativePath = publicId.replace(`${cloudRoot}/`, ''); // zone-1/John/ward-1/date/filename
+            const publicId = resource.public_id; // Zones/Zone-1/Rahul/1/date/filename
+            const relativePath = publicId.replace(`${cloudRoot}/`, '');
+            const extension = path.extname(url).split('?')[0] || '.jpg';
 
-            const filename = path.basename(url);
             const localFolder = path.join(baseDir, path.dirname(relativePath));
-            const localPath = path.join(localFolder, filename);
+            const localFile = path.join(localFolder, path.basename(relativePath) + extension);
 
-            // Skip if file already exists
-            if (fs.existsSync(localPath)) {
-                console.log(`⏭️ Already exists: ${localPath}`);
+            if (fs.existsSync(localFile)) {
+                console.log(`⏭️ Already exists: ${localFile}`);
                 continue;
             }
 
             fs.mkdirSync(localFolder, { recursive: true });
-
-            const file = fs.createWriteStream(localPath);
-            https.get(url, (response) => {
-                response.pipe(file);
-                console.log(`✅ Downloaded: ${localPath}`);
-            });
+            await downloadFile(url, localFile);
         }
     } catch (err) {
         console.error(`❌ Error during sync:`, err.message);
@@ -56,7 +72,5 @@ function syncNow() {
     downloadAllImagesUnderOrg();
 }
 
-// Run immediately and then every hour
 syncNow();
 cron.schedule('0 * * * *', syncNow);
-
