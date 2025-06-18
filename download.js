@@ -12,10 +12,10 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-const cloudRoot = 'Zones'; // Cloud root folder
-const baseDir = 'D:/Zones'; // Local base folder
+const cloudRoot = 'Zones';           // Cloud root folder
+const baseDir = 'D:/Zones';          // Local root folder
 
-// ⬇️ Download helper
+// ⬇️ File download helper
 function downloadFile(url, dest) {
     return new Promise((resolve, reject) => {
         const file = fs.createWriteStream(dest);
@@ -29,36 +29,37 @@ function downloadFile(url, dest) {
             });
         }).on('error', (err) => {
             if (fs.existsSync(dest)) fs.unlinkSync(dest);
-            console.error(`❌ Failed to download: ${dest}`, err.message);
+            console.error(`❌ Download failed: ${dest}`, err.message);
             reject(err);
         });
     });
 }
 
-// 📥 Download all images from Cloudinary
+// 📥 Sync from Cloudinary
 async function downloadAllImagesUnderOrg() {
     try {
-        const { resources } = await cloudinary.search
-            .expression(`folder:${cloudRoot}`)
+        const result = await cloudinary.search
+            .expression(`folder:${cloudRoot}/*`)
             .max_results(500)
             .execute();
 
-        if (!resources.length) {
-            console.log('⚠️ No resources found under Zones/');
+        const resources = result.resources;
+        if (!resources || resources.length === 0) {
+            console.log('⚠️ No resources found under Zones/*');
             return;
         }
 
         for (const resource of resources) {
             const url = resource.secure_url;
-            const publicId = resource.public_id; // Zones/Zone-1/Rahul/1/date/filename
-            const relativePath = publicId.replace(`${cloudRoot}/`, ''); // Remove "Zones/"
-            const ext = path.extname(url).split('?')[0] || '.jpg'; // Safe extension
-            const filename = path.basename(relativePath) + ext;
+            const publicId = resource.public_id; // e.g., Zones/Zone-1/Rahul/1/date/photo
+            const relativePath = publicId.replace(`${cloudRoot}/`, '');
+            const cloudFileName = path.basename(relativePath);
+            const ext = path.extname(url.split('?')[0]) || '.jpg'; // from URL
             const localFolder = path.join(baseDir, path.dirname(relativePath));
-            const localPath = path.join(localFolder, filename);
+            const localPath = path.join(localFolder, `${cloudFileName}${ext}`);
 
             if (fs.existsSync(localPath)) {
-                console.log(`⏭️ Already exists: ${localPath}`);
+                console.log(`⏭️ Skipped (already exists): ${localPath}`);
                 continue;
             }
 
@@ -66,15 +67,15 @@ async function downloadAllImagesUnderOrg() {
             await downloadFile(url, localPath);
         }
     } catch (err) {
-        console.error('❌ Cloudinary fetch error:', err.message);
+        console.error('❌ Error fetching from Cloudinary:', err.message);
     }
 }
 
-// 🔁 Run now and every hour
+// 🔁 Start now and schedule hourly
 function syncNow() {
     console.log(`🕒 Sync started at ${new Date().toLocaleString()}`);
     downloadAllImagesUnderOrg();
 }
 
-syncNow(); // Initial run
-cron.schedule('0 * * * *', syncNow); // Hourly
+syncNow();
+cron.schedule('0 * * * *', syncNow); // Every hour
