@@ -110,6 +110,10 @@ function syncNow() {
     console.log(`🕒 Sync started at ${new Date().toLocaleString()}`);
     downloadAllImages();
 }
-
 syncNow();
+console.log('✅ Cron job scheduled');
+
 cron.schedule('0 * * * *', syncNow); // Every hour
+
+// ⏳ Prevent script from exiting
+setInterval(() => { }, 1000 * 60 * 60);
