@@ -5,7 +5,6 @@ const path = require('path');
 const fs = require('fs');
 const cors = require('cors');
 const cloudinary = require('cloudinary').v2;
-const { exec } = require('child_process'); // 👈 Added to trigger download.js
 
 const app = express();
 app.use(cors());
@@ -34,11 +33,11 @@ app.post('/upload', upload.single('image'), async (req, res) => {
         return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // 📁 Folder structure: Zones/Zone/Supervisor/Ward/Date/Category
+    // 📁 Cloud folder structure: Zones/Zone/Supervisor/Ward/Date/Category
     const folderPath = `Zones/${zone}/${supervisor}/${ward}/${date}/${category}`;
     console.log('📥 Upload request received:');
     console.log('  Folder Path:', folderPath);
-    console.log('  Original Filename:', file.originalname);
+    console.log('  File:', file.originalname);
 
     try {
         const originalName = path.parse(file.originalname).name;
@@ -50,24 +49,12 @@ app.post('/upload', upload.single('image'), async (req, res) => {
             overwrite: false,
         });
 
-        fs.unlinkSync(file.path); // 🧹 Delete temp
-
-        // ✅ Trigger download.js after successful upload
-        const downloadScript = path.join(__dirname, 'download.js');
-
-        exec(`node "${downloadScript}"`, { env: { ...process.env } }, (err, stdout, stderr) => {
-            if (err) {
-                console.error('❌ Failed to run download.js:', err.message);
-                console.error('stderr:', stderr);
-                return;
-            }
-            console.log('📥 download.js executed successfully:\n', stdout);
-        });
-
+        // 🧹 Clean up temp file
+        fs.unlinkSync(file.path);
 
         // ✅ Respond to client
         res.status(200).json({
-            message: '✅ Upload successful and download triggered',
+            message: '✅ Upload successful',
             url: result.secure_url,
             cloudinary_path: result.public_id,
         });
@@ -78,8 +65,8 @@ app.post('/upload', upload.single('image'), async (req, res) => {
     }
 });
 
-// 🚀 Start server
+// 🚀 Start the server
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`🚀 Upload server running on port ${PORT}`);
 });
