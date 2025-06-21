@@ -3,7 +3,6 @@ const cloudinary = require('cloudinary').v2;
 const fs = require('fs');
 const https = require('https');
 const path = require('path');
-const cron = require('node-cron');
 
 // ☁️ Cloudinary configuration
 cloudinary.config({
@@ -39,7 +38,6 @@ function downloadFile(url, dest) {
 // 🔍 Extract metadata from Cloudinary public_id
 function extractFolderInfo(publicId) {
     const parts = publicId.split('/');
-    // Safe fallback if structure is incorrect
     if (parts.length < 7) {
         console.warn(`⚠️ Unexpected path structure: ${publicId}`);
         return null;
@@ -79,24 +77,20 @@ async function downloadAllImages() {
 
             const { zone, supervisor, ward, date, category, filename } = info;
 
-            // ✅ Proper local paths
             const fullPath = path.join(baseDir, zone, supervisor, ward, date, category);
             const fullFile = path.join(fullPath, `${filename}${ext}`);
 
             const dailyPath = path.join(baseDir, 'dailywork', date, category);
             const dailyFile = path.join(dailyPath, `${filename}${ext}`);
 
-            // Skip if already downloaded
             if (fs.existsSync(fullFile) && fs.existsSync(dailyFile)) {
                 console.log(`⏭️ Skipped (already exists): ${filename}`);
                 continue;
             }
 
-            // Ensure directories
             fs.mkdirSync(fullPath, { recursive: true });
             fs.mkdirSync(dailyPath, { recursive: true });
 
-            // Download both copies
             await downloadFile(url, fullFile);
             await downloadFile(url, dailyFile);
         }
@@ -105,15 +99,6 @@ async function downloadAllImages() {
     }
 }
 
-// 🚀 Run once now and hourly
-function syncNow() {
-    console.log(`🕒 Sync started at ${new Date().toLocaleString()}`);
-    downloadAllImages();
-}
-syncNow();
-console.log('✅ Cron job scheduled');
-
-cron.schedule('0 * * * *', syncNow); // Every hour
-
-// ⏳ Prevent script from exiting
-setInterval(() => { }, 1000 * 60 * 60);
+// 🔔 Run immediately
+console.log(`🕒 Sync started at ${new Date().toLocaleString()}`);
+downloadAllImages();
