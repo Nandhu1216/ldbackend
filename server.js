@@ -26,7 +26,12 @@ function downloadFile(url, dest) {
         const file = fs.createWriteStream(dest);
         https.get(url, (response) => {
             response.pipe(file);
-            file.on('finish', () => file.close(resolve));
+            file.on('finish', () => {
+                file.close(() => {
+                    console.log(`✅ Downloaded: ${dest}`);
+                    resolve();
+                });
+            });
         }).on('error', (err) => {
             if (fs.existsSync(dest)) fs.unlinkSync(dest);
             console.error(`❌ Download error: ${dest}`, err.message);
@@ -70,6 +75,7 @@ app.post('/upload', upload.single('image'), async (req, res) => {
 
         fs.unlinkSync(file.path);
 
+        // Delay download until upload finishes and is confirmed
         const info = extractFolderInfo(result.public_id);
         const ext = path.extname(result.secure_url.split('?')[0]) || '.jpg';
 
@@ -84,7 +90,10 @@ app.post('/upload', upload.single('image'), async (req, res) => {
             fs.mkdirSync(fullPath, { recursive: true });
             fs.mkdirSync(dailyPath, { recursive: true });
 
+            console.log(`⬇️ Starting download to: ${fullFile}`);
             await downloadFile(result.secure_url, fullFile);
+
+            console.log(`⬇️ Starting download to: ${dailyFile}`);
             await downloadFile(result.secure_url, dailyFile);
 
             console.log(`✅ Instant download complete for ${filename}`);
