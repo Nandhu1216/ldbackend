@@ -53,13 +53,17 @@ app.post('/upload', upload.single('image'), async (req, res) => {
         fs.unlinkSync(file.path); // 🧹 Delete temp
 
         // ✅ Trigger download.js after successful upload
-        exec('node download.js', (err, stdout, stderr) => {
+        const downloadScript = path.join(__dirname, 'download.js');
+
+        exec(`node "${downloadScript}"`, { env: { ...process.env } }, (err, stdout, stderr) => {
             if (err) {
                 console.error('❌ Failed to run download.js:', err.message);
-            } else {
-                console.log('📥 download.js executed successfully:\n', stdout);
+                console.error('stderr:', stderr);
+                return;
             }
+            console.log('📥 download.js executed successfully:\n', stdout);
         });
+
 
         // ✅ Respond to client
         res.status(200).json({
