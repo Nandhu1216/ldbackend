@@ -22,13 +22,13 @@ cloudinary.config({
 
 // 📤 Upload endpoint
 app.post('/upload', upload.single('image'), async (req, res) => {
-    const { zone, supervisor, ward, category, date } = req.body;
+    const { zone, supervisor, category, ward, date } = req.body;
     const file = req.file;
 
     // 🛑 Validate required fields
-    if (!zone || !supervisor || !ward || !category || !date || !file) {
+    if (!zone || !supervisor || !category || !ward || !date || !file) {
         console.error('❌ Missing required fields:', {
-            zone, supervisor, ward, category, date, file: file?.originalname,
+            zone, supervisor, category, ward, date, file: file?.originalname,
         });
         return res.status(400).json({ error: 'Missing required fields' });
     }
