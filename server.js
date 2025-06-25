@@ -33,8 +33,9 @@ app.post('/upload', upload.single('image'), async (req, res) => {
         return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // 📁 Cloud folder structure: Zones/Zone/Supervisor/Ward/Date/Category
-    const folderPath = `Zones/${zone}/${supervisor}/${ward}/${date}/${category}`;
+
+const folderPath = `Zones/${zone}/${supervisor}/${category}/${ward}/${date}`;
+
     console.log('📥 Upload request received:');
     console.log('  Folder Path:', folderPath);
     console.log('  File:', file.originalname);
